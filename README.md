@@ -4,57 +4,12 @@
 **Spark Authorizer** provides you with *SQL Standard Based Authorization* for [Apache Spark™](http://spark.apache.org) 
 as same as [SQL Standard Based Hive Authorization](https://cwiki.apache.org/confluence/display/Hive/SQL+Standard+Based+Hive+Authorization). 
 While you are using Spark SQL or Dataset/DataFrame API to load data from tables embedded with [Apache Hive™](https://hive.apache.org) metastore, 
-this library provides row/column level fine-grained access controls by [Apache Ranger™](https://ranger.apache.org) or Hive SQL Standard Based Authorization.
+this library provides row/column level fine-grained access https://yaooqinn.github.io/spark-authorizer/docs/spark_sql_authorization.htmlcontrols by [Apache Ranger™](https://ranger.apache.org) or Hive SQL Standard Based Authorization.
 
-Security is one of fundamental features for enterprise adoption. [Apache Ranger™](https://ranger.apache.org) offers many security plugins for many Hadoop ecosystem components, 
-such as HDFS, Hive, HBase, Solr and Sqoop2. However, [Apache Spark™](http://spark.apache.org) is not counted in yet. 
-When a secured HDFS cluster is used as a data warehouse accessed by various users and groups via different applications wrote by Spark and Hive, 
-it is very difficult to guarantee data management in a consistent way.  Apache Spark users visit data warehouse only 
-with Storage based access controls offered by HDFS. This library shares [Ranger Hive plugin](https://cwiki.apache.org/confluence/display/RANGER/Apache+Ranger+0.5.0+Installation#ApacheRanger0.5.0Installation-InstallingApacheHive(1.2.0)) 
-with Hive to help Spark talking to Ranger Admin. 
+This project has been altered to experiment with a third-party authorization library (casbin). Casbin supports various
+authorization models including RBAC, ABAC, and etc. A sample rbac config file is available under conf/
 
-Please refer to [ACL Management for Spark SQL](https://yaooqinn.github.io/spark-authorizer/docs/spark_sql_authorization.html) to see what spark-authorizer supports.
-
-## Quick Start
-
-### Step 1. Install Spark Authorizer
-
-Include this package in your Spark Applications using:
-#### spark-shell, pyspark, or spark-submit
-```bash
-> $SPARK_HOME/bin/spark-shell --packages yaooqinn:spark-authorizer:2.1.1
-```
-#### sbt
-If you use the sbt-spark-package plugin, in your sbt build file, add:
-```sbtshell
-spDependencies += "yaooqinn/spark-authorizer:2.1.1"
-```
-Otherwise,
-```sbtshell
-resolvers += "Spark Packages Repo" at "http://dl.bintray.com/spark-packages/maven"
-
-libraryDependencies += "yaooqinn" % "spark-authorizer" % "2.1.1"
-```
-
-#### Maven
-In your pom.xml, add:
-```xml
-<dependencies>
-  <!-- list of dependencies -->
-  <dependency>
-    <groupId>yaooqinn</groupId>
-    <artifactId>spark-authorizer</artifactId>
-    <version>2.1.1</version>
-  </dependency>
-</dependencies>
-<repositories>
-  <!-- list of other repositories -->
-  <repository>
-    <id>SparkPackagesRepo</id>
-    <url>http://dl.bintray.com/spark-packages/maven</url>
-  </repository>
-</repositories>
-```
+User will need to modify AuthzImpl.scala to modify the JDBC setting and casbin config location
 
 #### Manully
 If you [Building Spark Authorizer](https://yaooqinn.github.io/spark-authorizer/docs/building-spark-authorizer.html) manully, you can deploy via:
@@ -62,11 +17,7 @@ If you [Building Spark Authorizer](https://yaooqinn.github.io/spark-authorizer/d
 cp target/spark-authorizer-<version>.jar $SPARK_HOME/jars
 ```
 
-### Step 2. Install & Configure Ranger Hive Plugin
-
-Please refer to [Install Ranger Hive Plugin For Apache Spark](https://yaooqinn.github.io/spark-authorizer/docs/install_plugin.html) to learn how to deploy the plugin jars to Apache Spark and set Ranger/Hive configurations.
-
-### Step 3. Enable Spark Authorizer
+### Step 2. Enable Spark Authorizer
 
 In `$SPARK_HOME/conf/spark-defaults.conf`, add:
 

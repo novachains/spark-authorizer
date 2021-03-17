@@ -16,18 +16,20 @@
  */
 
 package org.apache.spark.sql.hive.client
+import java.util.{ List => JList }
 
-import java.util.{List => JList}
+import scala.collection.JavaConverters.asScalaBufferConverter
 
-import com.githup.yaooqinn.spark.authorizer.Logging
-import org.apache.hadoop.hive.ql.security.authorization.plugin._
-import org.apache.hadoop.hive.ql.session.SessionState
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAccessControlException
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject
 import org.apache.hadoop.security.UserGroupInformation
-
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.hive.{AuthzUtils, HiveExternalCatalog}
-import org.apache.spark.sql.internal.NonClosableMutableURLClassLoader
+import org.casbin.adapter.JDBCAdapter
+import org.casbin.jcasbin.main.Enforcer
 
+import com.mysql.cj.jdbc.MysqlDataSource
 /**
  * A Tool for Authorizer implementation.
  *
@@ -46,64 +48,49 @@ import org.apache.spark.sql.internal.NonClosableMutableURLClassLoader
 object AuthzImpl extends Logging {
   def checkPrivileges(
       spark: SparkSession,
-      hiveOpType: HiveOperationType,
-      inputObjs: JList[HivePrivilegeObject],
-      outputObjs: JList[HivePrivilegeObject],
-      context: HiveAuthzContext): Unit = {
-    val client = spark.sharedState
-      .externalCatalog.asInstanceOf[HiveExternalCatalog]
-      .client
-    val clientImpl = try {
-      client.asInstanceOf[HiveClientImpl]
-    } catch {
-      case _: ClassCastException =>
-        val clientLoader =
-          AuthzUtils.getFieldVal(client, "clientLoader").asInstanceOf[IsolatedClientLoader]
-        AuthzUtils.setFieldVal(clientLoader, "isolationOn", false)
-        AuthzUtils.setFieldVal(clientLoader,
-          "classLoader", new NonClosableMutableURLClassLoader(clientLoader.baseClassLoader))
-        clientLoader.cachedHive = null
-        val newClient = clientLoader.createClient()
-        AuthzUtils.setFieldVal(
-          spark.sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog],
-          "client",
-          newClient)
-        newClient.asInstanceOf[HiveClientImpl]
-    }
+      in: JList[HivePrivilegeObject],
+      out: JList[HivePrivilegeObject],
+      hiveOpType: HiveOperationType): Unit = {
 
-    val state = clientImpl.state
-    SessionState.setCurrentSessionState(state)
     val user = UserGroupInformation.getCurrentUser.getShortUserName
-    if (state.getAuthenticator.getUserName != user) {
-      val hiveConf = state.getConf
-      val newState = new SessionState(hiveConf, user)
-      SessionState.start(newState)
-      AuthzUtils.setFieldVal(clientImpl, "state", newState)
-    }
+    
+    /* Specify your jdbc configuration
+    val url = "jdbc:mysql://localhost:3306/db_name?createDatabaseIfNotExist=true&serverTimezone=UTC";
+    val username = "root";
+    val password = "password";
+    */
+    val dataSource = new MysqlDataSource();
+    dataSource.setURL(url);
+    dataSource.setUser(username);
+    dataSource.setPassword(password);
 
-    val authz = clientImpl.state.getAuthorizerV2
-    clientImpl.withHiveState {
-      if (authz != null) {
-        try {
-          authz.checkPrivileges(hiveOpType, inputObjs, outputObjs, context)
-        } catch {
-          case hae: HiveAccessControlException =>
-            error(
-              s"""
-                 |+===============================+
-                 ||Spark SQL Authorization Failure|
-                 ||-------------------------------|
-                 ||${hae.getMessage}
-                 ||-------------------------------|
-                 ||Spark SQL Authorization Failure|
-                 |+===============================+
-               """.stripMargin)
-            throw hae
-          case e: Exception => throw e
-        }
-      } else {
-        warn("Authorizer V2 not configured. Skipping privilege checking")
-      }
+    val a = new JDBCAdapter(dataSource);
+
+    /* specify location of conf file, a sample is under config/
+    val e = new Enforcer("rbac_model.conf", a); */
+    
+    for(obj <- in.asScala)
+    {
+    	val res = e.enforce(user, obj.getObjectName(), hiveOpType.name());
+    	if (res != true) {
+    		a.close();
+    		logError(
+    				s"""
+    				|+===============================+
+    				||Spark SQL Authorization Failure|
+    				||-------------------------------|
+    				||$user does not have ${hiveOpType.name()} privilege on ${obj.getObjectName()}
+    				||-------------------------------|
+    				||Spark SQL Authorization Failure|
+    				|+===============================+
+    				""".stripMargin)
+    		throw new HiveAccessControlException()
+    	}     
     }
+    
+    // Check the permission.
+
+    a.close();
+
   }
 }

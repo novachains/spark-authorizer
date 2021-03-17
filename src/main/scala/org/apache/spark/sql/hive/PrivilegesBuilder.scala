@@ -123,7 +123,7 @@ private[sql] object PrivilegesBuilder {
         // Unfortunately, the real world is always a place where miracles happen.
         // We check the privileges directly without resolving the plan and leave everything
         // to spark to do.
-        addTableOrViewLevelObjs(u.tableIdentifier, hivePrivilegeObjects)
+        //addTableOrViewLevelObjs(u, hivePrivilegeObjects)
 
       case p =>
         for (child <- p.children) {
@@ -207,9 +207,9 @@ private[sql] object PrivilegesBuilder {
 
       case a: AnalyzeColumnCommand =>
         addTableOrViewLevelObjs(
-          a.tableIdent, inputObjs, columns = a.columnNames)
+          a.tableIdent, inputObjs, columns = a.columnNames.getOrElse(Nil))
         addTableOrViewLevelObjs(
-          a.tableIdent, outputObjs, columns = a.columnNames)
+          a.tableIdent, outputObjs, columns = a.columnNames.getOrElse(Nil))
 
       case a if a.nodeName == "AnalyzePartitionCommand" =>
         addTableOrViewLevelObjs(
@@ -254,15 +254,15 @@ private[sql] object PrivilegesBuilder {
         addDbLevelObjs(c.sourceTable, inputObjs)
         addTableOrViewLevelObjs(c.sourceTable, inputObjs)
 
-      case c: CreateViewCommand =>
+ /*     case c: CreateViewCommand =>
         c.viewType match {
-          case PersistedView =>
+          case  PersistedView =>
             // PersistedView will be tied to a database
             addDbLevelObjs(c.name, outputObjs)
             addTableOrViewLevelObjs(c.name, outputObjs)
           case _ =>
-        }
-        buildQuery(c.child, inputObjs)
+        }*/
+        buildQuery(c.children(0), inputObjs)
 
       case d if d.nodeName == "DescribeColumnCommand" =>
         addTableOrViewLevelObjs(
@@ -328,7 +328,7 @@ private[sql] object PrivilegesBuilder {
       case s if s.nodeName == "SaveIntoDataSourceCommand" =>
         buildQuery(getFieldVal(s, "query").asInstanceOf[LogicalPlan], outputObjs)
 
-      case s: SetDatabaseCommand => addDbLevelObjs(s.databaseName, inputObjs)
+ //     case s: SetDatabaseCommand => addDbLevelObjs(s.databaseName, inputObjs)
 
       case s: ShowColumnsCommand => addTableOrViewLevelObjs(s.tableName, inputObjs)
 

@@ -19,10 +19,10 @@ package org.apache.spark.sql.catalyst.optimizer
 
 import java.io.File
 
-import com.githup.yaooqinn.spark.authorizer.Logging
 import org.apache.hadoop.hive.ql.plan.HiveOperation
 import org.apache.hadoop.hive.ql.security.authorization.plugin.{HiveAuthzContext, HiveOperationType}
 
+import org.apache.spark.internal.Logging;
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.{Command, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -48,13 +48,10 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
    */
   override def apply(plan: LogicalPlan): LogicalPlan = {
     val operationType: HiveOperationType = getOperationType(plan)
-    val authzContext = new HiveAuthzContext.Builder().build()
     val (in, out) = PrivilegesBuilder.build(plan)
-    spark.sharedState.externalCatalog match {
-      case _: HiveExternalCatalog =>
-        AuthzImpl.checkPrivileges(spark, operationType, in, out, authzContext)
-      case _ =>
-    }
+
+    AuthzImpl.checkPrivileges(spark, in, out, operationType)
+    
     // iff no exception.
     // We just return the original plan here, so this rule will be executed only once.
     plan
@@ -69,10 +66,10 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
     val file = new File(dir)
     if (!file.exists()) {
       if (file.mkdirs()) {
-        info("Creating ranger policy cache directory at " + file.getAbsolutePath)
+        logInfo("Creating ranger policy cache directory at " + file.getAbsolutePath)
         file.deleteOnExit()
       } else {
-        warn("Unable to create ranger policy cache directory at " + file.getAbsolutePath)
+        logWarning("Unable to create ranger policy cache directory at " + file.getAbsolutePath)
       }
     }
   }
@@ -159,10 +156,10 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
 
         case p if p.nodeName == "SaveIntoDataSourceCommand" => HiveOperation.QUERY
         case s: SetCommand if s.kv.isEmpty || s.kv.get._2.isEmpty => HiveOperation.SHOWCONF
-        case _: SetDatabaseCommand => HiveOperation.SWITCHDATABASE
+//        case _: SetDatabaseCommand => HiveOperation.SWITCHDATABASE
         case _: ShowCreateTableCommand => HiveOperation.SHOW_CREATETABLE
         case _: ShowColumnsCommand => HiveOperation.SHOWCOLUMNS
-        case _: ShowDatabasesCommand => HiveOperation.SHOWDATABASES
+//        case _: ShowDatabasesCommand => HiveOperation.SHOWDATABASES
         case _: ShowFunctionsCommand => HiveOperation.SHOWFUNCTIONS
         case _: ShowPartitionsCommand => HiveOperation.SHOWPARTITIONS
         case _: ShowTablesCommand => HiveOperation.SHOWTABLES
